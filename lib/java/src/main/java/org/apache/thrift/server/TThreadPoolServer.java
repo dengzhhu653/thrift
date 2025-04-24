@@ -220,19 +220,16 @@ public class TThreadPoolServer extends TServer {
     /** Loops on processing a client forever */
     @Override
     public void run() {
-      TProcessor processor = null;
-      TTransport inputTransport = null;
-      TTransport outputTransport = null;
       TProtocol inputProtocol = null;
       TProtocol outputProtocol = null;
 
       Optional<TServerEventHandler> eventHandler = Optional.empty();
       ServerContext connectionContext = null;
 
-      try {
-        processor = processorFactory_.getProcessor(client_);
-        inputTransport = inputTransportFactory_.getTransport(client_);
-        outputTransport = outputTransportFactory_.getTransport(client_);
+      try (TTransport transport = client_;
+          TTransport inputTransport = inputTransportFactory_.getTransport(client_);
+          TTransport outputTransport = outputTransportFactory_.getTransport(client_)) {
+        TProcessor processor = processorFactory_.getProcessor(client_);
         inputProtocol = inputProtocolFactory_.getProtocol(inputTransport);
         outputProtocol = outputProtocolFactory_.getProtocol(outputTransport);
 
@@ -242,7 +239,7 @@ public class TThreadPoolServer extends TServer {
           connectionContext = eventHandler.get().createContext(inputProtocol, outputProtocol);
         }
 
-        while (true) {
+        while (!stopped_) {
           if (Thread.currentThread().isInterrupted()) {
             LOGGER.debug("WorkerProcess requested to shutdown");
             break;
@@ -261,15 +258,6 @@ public class TThreadPoolServer extends TServer {
       } finally {
         if (eventHandler.isPresent()) {
           eventHandler.get().deleteContext(connectionContext, inputProtocol, outputProtocol);
-        }
-        if (inputTransport != null) {
-          inputTransport.close();
-        }
-        if (outputTransport != null) {
-          outputTransport.close();
-        }
-        if (client_.isOpen()) {
-          client_.close();
         }
       }
     }

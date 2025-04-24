@@ -53,25 +53,20 @@ public class TSimpleServer extends TServer {
     setServing(true);
 
     while (!stopped_) {
-      TTransport client = null;
-      TProcessor processor = null;
-      TTransport inputTransport = null;
-      TTransport outputTransport = null;
       TProtocol inputProtocol = null;
       TProtocol outputProtocol = null;
       ServerContext connectionContext = null;
-      try {
-        client = serverTransport_.accept();
+      try (TTransport client = serverTransport_.accept();
+          TTransport inputTransport = inputTransportFactory_.getTransport(client);
+          TTransport outputTransport = outputTransportFactory_.getTransport(client)) {
         if (client != null) {
-          processor = processorFactory_.getProcessor(client);
-          inputTransport = inputTransportFactory_.getTransport(client);
-          outputTransport = outputTransportFactory_.getTransport(client);
+          TProcessor processor = processorFactory_.getProcessor(client);
           inputProtocol = inputProtocolFactory_.getProtocol(inputTransport);
           outputProtocol = outputProtocolFactory_.getProtocol(outputTransport);
           if (eventHandler_ != null) {
             connectionContext = eventHandler_.createContext(inputProtocol, outputProtocol);
           }
-          while (true) {
+          while (!stopped_) {
             if (eventHandler_ != null) {
               eventHandler_.processContext(connectionContext, inputTransport, outputTransport);
             }
@@ -93,14 +88,6 @@ public class TSimpleServer extends TServer {
 
       if (eventHandler_ != null) {
         eventHandler_.deleteContext(connectionContext, inputProtocol, outputProtocol);
-      }
-
-      if (inputTransport != null) {
-        inputTransport.close();
-      }
-
-      if (outputTransport != null) {
-        outputTransport.close();
       }
     }
     setServing(false);
